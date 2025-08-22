@@ -1,9 +1,5 @@
-# Variáveis de ambiente
-.env
-
-# Pasta do ambiente virtual
 venv/
-
-# Arquivos temporários do Python
 __pycache__/
 *.pyc
+.env
+credentials_mob_ia.json

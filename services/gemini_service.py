@@ -17,7 +17,7 @@ def get_intent(texto_usuario):
     """
     if not model:
         return {"intent": "erro_ia", "parameters": {}, "response_to_user": "Estou com um probleminha técnico. Tente novamente em um instante."}
-
+    
     prompt = f"""
     Você é a "Mob.IA", uma assistente de mobilidade urbana para o Rio de Janeiro.
     Sua personalidade é prestativa, clara e confiável.

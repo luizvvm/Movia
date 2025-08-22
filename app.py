@@ -37,7 +37,7 @@ def webhook():
         
     elif intent == 'consultar_sustentabilidade':
         response_text = sustainability_module.handle_request(parameters)
-        
+    
     else: # conversa_geral ou qualquer outra coisa
         response_text = "Olá! Sou a Mob.IA, sua assistente de mobilidade no Rio. Como posso te ajudar a se locomover hoje? Você pode me perguntar sobre rotas, segurança ou opções de transporte sustentável."
 
