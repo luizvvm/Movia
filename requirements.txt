@@ -4,3 +4,4 @@ python-dotenv
 twilio
 google-generativeai
 google-cloud-firestore
+gunicorn
