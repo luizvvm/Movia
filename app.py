@@ -1,9 +1,10 @@
 # app.py
 from flask import Flask, request
+from twilio.twiml.messaging_response import MessagingResponse # <-- MUDANÇA IMPORTANTE
 import config
 
 # Importando nossos serviços e módulos
-from services import gemini_service, whatsapp_service, database_service
+from services import gemini_service, database_service
 from modules import routing_module, safety_module, sustainability_module
 
 app = Flask(__name__)
@@ -14,7 +15,7 @@ def webhook():
     from_number = request.values.get('From', '')
 
     if not message_body or not from_number:
-        return 'OK', 200
+        return '', 204 # Retorna uma resposta vazia se não houver corpo
 
     print(f"INFO: Mensagem recebida de {from_number}: '{message_body}'")
 
@@ -37,14 +38,16 @@ def webhook():
         
     elif intent == 'consultar_sustentabilidade':
         response_text = sustainability_module.handle_request(parameters)
-    
+        
     else: # conversa_geral ou qualquer outra coisa
         response_text = "Olá! Sou a Mob.IA, sua assistente de mobilidade no Rio. Como posso te ajudar a se locomover hoje? Você pode me perguntar sobre rotas, segurança ou opções de transporte sustentável."
 
-    # 4. Enviar a resposta para o usuário
-    whatsapp_service.send_message(from_number, response_text)
+    # 4. Construir a resposta no formato TwiML que a Twilio espera
+    twiml_response = MessagingResponse()
+    twiml_response.message(response_text)
 
-    return 'OK', 200
+    # Retorna a resposta formatada
+    return str(twiml_response)
 
 if __name__ == '__main__':
     app.run(debug=True, port=config.PORT)
