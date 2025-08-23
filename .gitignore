@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .env
 credentials_mob_ia.json
+local_test.py
