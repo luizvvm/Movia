@@ -18,3 +18,5 @@ FIRESTORE_PROJECT_ID = os.getenv("FIRESTORE_PROJECT_ID")
 
 # Configs do Flask
 PORT = os.getenv("PORT", default=5000)
+
+GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
