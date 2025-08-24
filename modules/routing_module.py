@@ -1,118 +1,143 @@
 import requests
+import os
 from config import GOOGLE_MAPS_API_KEY
 
-def handle_request(parameters):
+def gerar_lista_transportes_publicos():
     """
-    Lógica para consultar e sugerir rotas integrando com Google Directions API.
+    Retorna lista numerada de transportes públicos do Rio (sem carro)
     """
-    origem = parameters.get('origem', '').strip()
-    destino = parameters.get('destino', '').strip()
-    modo_transporte = parameters.get('modo_transporte', 'transit').lower()
-    
-    # Validação básica
-    if not origem or not destino:
-        return "❌ Preciso saber de onde você está saindo e para onde quer ir. Por favor, informe origem e destino."
-    
-    # Modo de desenvolvimento - se não tiver chave API
-    if not GOOGLE_MAPS_API_KEY or GOOGLE_MAPS_API_KEY == "sua_chave_google_maps_aqui":
-        return gerar_rota_simulada(origem, destino, modo_transporte)
-    
-    try:
-        # Consulta a API do Google Maps
-        rota = consultar_google_maps(origem, destino, modo_transporte)
-        
-        if rota:
-            return formatar_resposta(rota, origem, destino, modo_transporte)
-        else:
-            return "❌ Não consegui encontrar rotas para esse trajeto. Verifique se os locais estão corretos."
-            
-    except Exception as e:
-        print(f"Erro ao consultar rotas: {e}")
-        return "⚠️ Desculpe, estou com problemas para acessar o sistema de rotas. Tente novamente em alguns instantes."
+    transportes = [
+        {'numero': 1, 'emoji': '🚌', 'nome': 'Ônibus', 'modo': 'onibus', 'tag': 'bus'},
+        {'numero': 2, 'emoji': '🚇', 'nome': 'Metrô', 'modo': 'metro', 'tag': 'subway'},
+        {'numero': 3, 'emoji': '🚆', 'nome': 'Trem', 'modo': 'trem', 'tag': 'train'},
+        {'numero': 4, 'emoji': '🚋', 'nome': 'VLT', 'modo': 'vlt', 'tag': 'tram'},
+        {'numero': 5, 'emoji': '⛴️', 'nome': 'Barca', 'modo': 'barca', 'tag': 'ferry'},
+        {'numero': 6, 'emoji': '🚴‍♂️', 'nome': 'Bicicleta', 'modo': 'bicicleta', 'tag': 'bicycling'},
+        {'numero': 7, 'emoji': '🚶‍♂️', 'nome': 'Caminhada', 'modo': 'caminhada', 'tag': 'walking'}
+    ]
+    return transportes
 
+def formatar_lista_transportes():
+    """
+    Formata a lista para display no WhatsApp
+    """
+    transportes = gerar_lista_transportes_publicos()
+    
+    mensagem = "🚍 *Como você prefere ir?*\n\n"
+    
+    for transp in transportes:
+        mensagem += f"{transp['numero']}. {transp['emoji']} {transp['nome']}\n"
+    
+    mensagem += "\n*Digite o número da opção desejada:*"
+    
+    return mensagem
 
-def consultar_google_maps(origem, destino, modo):
+def interpretar_escolha_transporte(numero_escolhido):
     """
-    Consulta a Google Directions API para obter rotas
+    Converte número escolhido em modo de transporte API
     """
-    # Mapeamento de modos de transporte
+    transportes = gerar_lista_transportes_publicos()
+    
+    for transp in transportes:
+        if transp['numero'] == numero_escolhido:
+            return transp['modo'], transp['tag']
+    
+    return None, None
+
+def get_modo_transporte_por_tag(tag):
+    """
+    Retorna modo em português pela tag da API
+    """
+    modos = {
+        'bus': 'ônibus',
+        'subway': 'metrô', 
+        'train': 'trem',
+        'tram': 'VLT',
+        'ferry': 'barca',
+        'bicycling': 'bicicleta',
+        'walking': 'caminhada'
+    }
+    return modos.get(tag, 'transporte')
+
+def consultar_google_maps(origem, destino, modo_transporte="transit", api_key=None):
+    """
+    Consulta a Google Maps Directions API para rotas reais
+    """
+    url = "https://maps.googleapis.com/maps/api/directions/json"
+
+    # Mapeamento completo dos transportes do Rio
     modos_api = {
         'onibus': 'transit',
+        'ônibus': 'transit',
         'metro': 'transit', 
-        'transit': 'transit',
+        'metrô': 'transit',
+        'trem': 'transit',
+        'vlt': 'transit',
+        'barca': 'transit',
         'bicicleta': 'bicycling',
         'bike': 'bicycling',
         'caminhada': 'walking',
+        'a pé': 'walking',
         'walking': 'walking',
-        'carro': 'driving',
-        'driving': 'driving'
+        'bicycling': 'bicycling'
     }
-    
-    modo_api = modos_api.get(modo, 'transit')
-    
-    url = "https://maps.googleapis.com/maps/api/directions/json"
-    
+
+    modo_api = modos_api.get(modo_transporte, "transit")
+
+    origem_completa = f"{origem}, Rio de Janeiro, Brasil"
+    destino_completo = f"{destino}, Rio de Janeiro, Brasil"
+
     params = {
-        'origin': origem,
-        'destination': destino,
-        'mode': modo_api,
-        'alternatives': 'true',
-        'language': 'pt-BR',
-        'region': 'br',
-        'key': GOOGLE_MAPS_API_KEY
+        "origin": origem_completa,
+        "destination": destino_completo,
+        "mode": modo_api,
+        "key": api_key,
+        "language": "pt-BR",
+        "region": "br"
     }
-    
-    # Configurações específicas para transporte público
+
+    # Configurações específicas para cada tipo de transporte público
     if modo_api == 'transit':
-        params['transit_mode'] = 'bus|subway'
-        params['transit_routing_preference'] = 'fewer_transfers'
-    
+        # Define quais modos de transporte incluir baseado na escolha
+        if modo_transporte == 'metro':
+            params["transit_mode"] = "subway"
+        elif modo_transporte == 'trem':
+            params["transit_mode"] = "train"  
+        elif modo_transporte == 'vlt':
+            params["transit_mode"] = "tram"
+        elif modo_transporte == 'barca':
+            params["transit_mode"] = "ferry"
+        elif modo_transporte in ['onibus', 'ônibus']:
+            params["transit_mode"] = "bus"
+        else:
+            # Todos os modos públicos
+            params["transit_mode"] = "bus|subway|train|tram|ferry"
+            
+        params["transit_routing_preference"] = "fewer_transfers"
+
     response = requests.get(url, params=params, timeout=10)
-    response.raise_for_status()
-    
-    data = response.json()
-    
-    if data['status'] == 'OK' and data['routes']:
-        return data
-    else:
-        return None
+    return response.json()
 
-
-def formatar_resposta(data, origem, destino, modo):
-    """
-    Formata a resposta da API para uma mensagem amigável no WhatsApp
-    """
+def formatar_resposta_google_maps(data, origem, destino, modo):
     rota = data['routes'][0]
     perna = rota['legs'][0]
     
-    # Emoji baseado no modo de transporte
-    emojis = {
-        'transit': '🚍',
-        'bicycling': '🚴‍♂️', 
-        'walking': '🚶‍♂️',
-        'driving': '🚗'
-    }
+    # Extrai informações principais
+    tempo_total = perna['duration']['text']
+    distancia_total = perna['distance']['text']
+    preco = rota['fare']['text'] if 'fare' in rota else 'R$ 4,30'
     
-    emoji = emojis.get(modo, '📍')
+    # Constrói a resposta
+    resposta = f"🚍 *ROTA ENCONTRADA!*\n\n"
+    resposta += f"📍 *De:* {origem.title()}\n"
+    resposta += f"🎯 *Para:* {destino.title()}\n"
+    resposta += f"⏰ *Tempo:* {tempo_total}\n"
+    resposta += f"📏 *Distância:* {distancia_total}\n"
+    resposta += f"💵 *Preço:* {preco}\n\n"
     
-    # Nome do modo em português
-    nomes_modos = {
-        'transit': 'Transporte Público',
-        'bicycling': 'Bicicleta',
-        'walking': 'Caminhada', 
-        'driving': 'Carro'
-    }
+    resposta += "📋 *Instruções:*\n"
     
-    nome_modo = nomes_modos.get(modo, 'Transporte Público')
-    
-    # Construindo a resposta
-    resposta = f"{emoji} *ROTA DE {nome_modo.upper()}*\n\n"
-    resposta += f"📍 *Origem:* {origem.title()}\n"
-    resposta += f"🎯 *Destino:* {destino.title()}\n\n"
-    
-    resposta += "📋 *Instruções da Rota:*\n"
-    
-    # Adiciona cada etapa da rota
+    # Processa cada etapa da viagem
     for i, etapa in enumerate(perna['steps'], 1):
         instrucao = etapa['html_instructions']
         
@@ -121,87 +146,61 @@ def formatar_resposta(data, origem, destino, modo):
         instrucao = instrucao.replace('<div style="font-size:0.9em">', ' (')
         instrucao = instrucao.replace('</div>', ')')
         
-        # Emoji para a etapa
-        modo_etapa = etapa.get('travel_mode', '').lower()
-        emoji_etapa = {
-            'walking': '🚶‍♂️',
-            'transit': '🚌',
-            'bicycling': '🚴‍♂️'
-        }.get(modo_etapa, '📍')
-        
-        # Informações de transporte público
-        if modo_etapa == 'transit' and 'transit_details' in etapa:
+        # Adiciona emoji baseado no modo
+        if 'transit_details' in etapa:
             detalhes = etapa['transit_details']
             linha = detalhes['line']
-            tipo_veiculo = linha.get('vehicle', {}).get('type', '').lower()
-            
-            if tipo_veiculo == 'bus':
-                emoji_etapa = '🚌'
-                veiculo_texto = 'Ônibus'
-            elif tipo_veiculo == 'subway':
-                emoji_etapa = '🚇' 
-                veiculo_texto = 'Metrô'
-            else:
-                veiculo_texto = 'Transporte'
-            
-            numero_linha = linha.get('short_name', '')
-            instrucao = f"{emoji_etapa} Pegue o {veiculo_texto} {numero_linha}"
+            instrucao = f"🚌 Pegue o {linha['short_name']} - {linha['name']}"
         
-        resposta += f"{i}. {emoji_etapa} {instrucao} ({etapa['duration']['text']})\n"
-    
-    # Informações finais
-    resposta += f"\n⏰ *Tempo total:* {perna['duration']['text']}\n"
-    resposta += f"📏 *Distância total:* {perna['distance']['text']}\n\n"
-    
-    # Dica final
-    resposta += "💡 *Dica:* Use o Google Maps para navegação em tempo real!"
+        resposta += f"{i}. {instrucao} ({etapa['duration']['text']})\n"
     
     return resposta
 
 
-def gerar_rota_simulada(origem, destino, modo):
-    """Gera uma rota simulada para desenvolvimento"""
+def gerar_rota_simulada_elaborada(origem, destino, modo):
+    """
+    Fallback caso a API do Google falhe
+    """
+    return "❌ Não foi possível calcular a rota no momento. Tente novamente em alguns instantes."
+
+
+def handle_request(parameters, escolha_transporte=None):
+    """
+    Lógica principal para consultar rotas
+    """
+    origem = parameters.get('origem', '').strip()
+    destino = parameters.get('destino', '').strip()
+    modo_transporte = parameters.get('modo_transporte', '').lower()
     
-    emojis = {
-        'onibus': '🚌',
-        'metro': '🚇',
-        'transit': '🚍',
-        'bicicleta': '🚴‍♂️',
-        'bike': '🚴‍♂️',
-        'caminhada': '🚶‍♂️',
-        'walking': '🚶‍♂️',
-        'carro': '🚗',
-        'driving': '🚗'
-    }
+    # Se receber uma escolha de transporte, processa
+    if escolha_transporte and escolha_transporte.isdigit():
+        modo, tag = interpretar_escolha_transporte(int(escolha_transporte))
+        if modo:
+            modo_transporte = modo
+        else:
+            return "❌ Opção inválida. " + formatar_lista_transportes()
     
-    emoji = emojis.get(modo, '🚌')
+    # Se não tiver modo de transporte, mostra lista
+    if not modo_transporte:
+        return formatar_lista_transportes()
     
-    return f"""
-{emoji} *ROTA SIMULADA - MODO DESENVOLVIMENTO*
-
-📍 *Origem:* {origem.title()}
-🎯 *Destino:* {destino.title()}
-
-📋 *Instruções:*
-1. 🚶‍♂️ Caminhe até a parada mais próxima (5 min)
-2. {emoji} Pegue o {modo} 123 em direção ao centro (20 min)
-3. 🚶‍♂️ Caminhe até o destino final (8 min)
-
-⏰ *Tempo total:* 33 min
-📏 *Distância:* 7,5 km
-
-💡 *Dica:* Esta é uma rota simulada. Para rotas reais, configure a API do Google Maps.
-"""
-
-
-# Para teste local (opcional)
-if __name__ == "__main__":
-    # Teste rápido
-    teste_params = {
-        'origem': 'copacabana rio de janeiro',
-        'destino': 'ipanema rio de janeiro',
-        'modo_transporte': 'onibus'
-    }
+    # Se não tiver origem ou destino, pede
+    if not origem or not destino:
+        if not origem:
+            return "📍 *De onde você está saindo?*"
+        else:
+            return "🎯 *Para onde você quer ir?*"
     
-    resultado = handle_request(teste_params)
-    print(resultado)
+    # Agora calcula a rota
+    try:
+        resultado = consultar_google_maps(origem, destino, modo_transporte, GOOGLE_MAPS_API_KEY)
+        
+        if resultado.get('status') == 'OK' and resultado['routes']:
+            return formatar_resposta_google_maps(resultado, origem, destino, modo_transporte)
+        else:
+            erro = resultado.get('error_message', 'Erro na consulta da rota')
+            return f"❌ {erro}"
+            
+    except Exception as e:
+        print(f"Erro ao calcular rota: {e}")
+        return "❌ Erro temporário no sistema. Tente em alguns instantes."

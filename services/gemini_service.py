@@ -64,3 +64,4 @@ def get_intent(texto_usuario):
     except (json.JSONDecodeError, Exception) as e:
         print(f"ERRO: Falha ao processar resposta do Gemini: {e}. Resposta recebida: {response.text}")
         return {"intent": "conversa_geral", "parameters": {}}
+    
