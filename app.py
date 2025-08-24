@@ -6,6 +6,7 @@ import config
 # Importando nossos serviços e módulos
 from services import gemini_service, database_service
 from modules import routing_module, safety_module, sustainability_module
+from modules.routing_module import formatar_lista_transportes, interpretar_escolha_transporte
 
 # Cria uma instância da aplicação Flask, que será o núcleo do servidor web.
 app = Flask(__name__)
@@ -29,6 +30,20 @@ def webhook():
     
     # 2. Registrar a interação no banco de dados
     database_service.registrar_interacao(from_number, message_body, intent)
+
+    if intent == 'consultar_rota':
+    # Verifica se é uma escolha de transporte
+    if message_body.strip().isdigit():
+        numero = int(message_body.strip())
+        modo, tag = interpretar_escolha_transporte(numero)
+        if modo:
+            parameters['modo_transporte'] = modo
+            response_text = routing_module.handle_request(parameters)
+        else:
+            response_text = "❌ Opção inválida. " + formatar_lista_transportes()
+    else:
+        # Processamento normal
+        response_text = routing_module.handle_request(parameters)
 
     response_text = ""
 
