@@ -7,12 +7,15 @@ import config
 from services import gemini_service, database_service
 from modules import routing_module, safety_module, sustainability_module
 
+# Cria uma instância da aplicação Flask, que será o núcleo do servidor web.
 app = Flask(__name__)
 
+# Define a rota para o webhook do WhatsApp. Esta rota será o ponto de entrada para mensagens do WhatsApp
 @app.route('/webhook/whatsapp', methods=['POST'])
+# Função que processará todas as mensagens recebidas do WhatsApp.
 def webhook():
     message_body = request.values.get('Body', '').strip()
-    from_number = request.values.get('From', '')
+    from_number = request.values.get('From', '')  # Identificador do remetente
 
     if not message_body or not from_number:
         return '', 204 # Retorna uma resposta vazia se não houver corpo
