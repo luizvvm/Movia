@@ -11,57 +11,45 @@ except Exception as e:
     print(f"ERRO CRÍTICO: Falha ao inicializar o modelo Gemini. Verifique a GEMINI_API_KEY. Erro: {e}")
     model = None
 
-def get_intent(texto_usuario):
+# services/gemini_service.py
+import json
+
+def get_intent(contexto_completo):
     """
-    Analisa a mensagem do usuário e retorna a intenção e os parâmetros.
+    Analisa a mensagem do usuário no contexto do histórico,
+    retorna intenção, parâmetros e novo resumo.
     """
-    if not model:
-        return {"intent": "erro_ia", "parameters": {}, "response_to_user": "Estou com um probleminha técnico. Tente novamente em um instante."}
-    
     prompt = f"""
-    Você é a "Mob.IA", uma assistente de mobilidade urbana para o Rio de Janeiro.
-    Sua personalidade é prestativa, clara e confiável.
-    Seu objetivo é analisar a mensagem do usuário e identificar a intenção principal para rotear a solicitação.
+    Você é a Mob.IA, assistente de mobilidade do Rio.
 
-    As intenções possíveis são:
-    - "consultar_rota": O usuário quer saber como ir de um ponto A para um ponto B. Extraia a origem e o destino.
-    - "consultar_seguranca": O usuário está perguntando sobre a segurança de um local ou linha de ônibus. Extraia o local ou linha.
-    - "consultar_sustentabilidade": O usuário quer uma rota com menor emissão de CO2 ou informações sobre transportes ecológicos.
-    - "conversa_geral": Qualquer outra interação (saudações, perguntas genéricas, etc.).
+    Contexto até agora:
+    {contexto_completo}
 
-    MENSAGEM DO USUÁRIO: "{texto_usuario}"
+    Tarefas:
+    1. Identifique a intenção principal do usuário.
+       Possíveis intents: ["consultar_rota", "consultar_seguranca", "consultar_sustentabilidade", "conversa_geral"].
+    2. Extraia parâmetros relevantes (origem, destino, bairro, horário, modal etc).
+    3. Gere um resumo atualizado do histórico do usuário em no máximo 3 frases, 
+       mantendo preferências e assuntos recorrentes.
 
-    Responda SEMPRE no seguinte formato JSON:
+    Responda em JSON no formato:
     {{
-      "intent": "string",
-      "parameters": {{
-        "origem": "string (opcional)",
-        "destino": "string (opcional)",
-        "local": "string (opcional)"
-      }}
+      "intent": "...",
+      "parameters": {{...}},
+      "novo_resumo": "..."
     }}
-
-    Exemplos:
-    1. MENSAGEM: "bom dia"
-       RESPOSTA: {{"intent": "conversa_geral", "parameters": {{}}}}
-
-    2. MENSAGEM: "como faço pra ir da Central do Brasil até Copacabana?"
-       RESPOSTA: {{"intent": "consultar_rota", "parameters": {{"origem": "Central do Brasil", "destino": "Copacabana"}}}}
-
-    3. MENSAGEM: "a linha 483 é perigosa à noite?"
-       RESPOSTA: {{"intent": "consultar_seguranca", "parameters": {{"local": "linha 483 noite"}}}}
-
-    4. MENSAGEM: "qual o jeito mais ecológico de chegar no Jardim Botânico?"
-       RESPOSTA: {{"intent": "consultar_sustentabilidade", "parameters": {{"destino": "Jardim Botânico"}}}}
     """
-
     try:
-        response = model.generate_content(prompt)
-        # Limpando a resposta para garantir que seja um JSON válido
-        cleaned_response = response.text.strip().replace('```json', '').replace('```', '').strip()
-        parsed_json = json.loads(cleaned_response)
-        return parsed_json
-    except (json.JSONDecodeError, Exception) as e:
-        print(f"ERRO: Falha ao processar resposta do Gemini: {e}. Resposta recebida: {response.text}")
-        return {"intent": "conversa_geral", "parameters": {}}
+        # Exemplo genérico de chamada ao Gemini (ajuste ao seu client real):
+        resposta = model.generate_content(prompt)  
+        cleaned_response = resposta.text.strip().replace('```json', '').replace('```', '').strip()
+        dados = json.loads(cleaned_response)
+        return dados
+    except Exception as e:
+        print(f"ERRO em get_intent: {e}")
+        return {
+            "intent": "conversa_geral",
+            "parameters": {},
+            "novo_resumo": contexto_completo[:300]  # fallback simples
+        }
     
