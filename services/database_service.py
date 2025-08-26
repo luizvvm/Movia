@@ -101,3 +101,14 @@ def registrar_interacao(user_id, texto_usuario, intent):
 
     except Exception as e:
         print(f"ERRO: Falha ao registrar interação no Firestore: {e}")
+
+def salvar_rotas_usuario(user_id, rotas):
+    """Salva as rotas do usuário para consulta posterior"""
+    # Implementando a lógica para salvar no banco de dados
+    print(f"💾 Salvando rotas para usuário {user_id}")
+
+def carregar_rotas_usuario(user_id):
+    """Carrega as rotas salvas do usuário"""
+    # Implementando a lógica para carregar do banco
+    print(f"📂 Carregando rotas do usuário {user_id}")
+    return []  # Retorna a lista de rotas salvas
