@@ -70,7 +70,8 @@ def consultar_google_maps(origem, destino, modo_transporte="transit", api_key=No
         "mode": modo_api,
         "key": api_key,
         "language": "pt-BR",
-        "region": "br"
+        "region": "br",
+        "alternatives": "true"  # 👈 habilita rotas alternativas
     }
     if modo_api == 'transit':
         if modo_transporte == 'metro':
@@ -201,138 +202,73 @@ def formatar_instrucao_com_referencia(instrucao, modo):
         return f"passe por {referencia} e {instrucao.lower()}"
     return instrucao
 
-def formatar_resposta_google_maps(data, origem, destino, modo):
+def formatar_resposta_google_maps(origem, destino, steps, tempo):
     """
-    Formata a resposta da rota obtida do Google Maps:
-    - Caminhada curta até parada/estação de transporte: instrução única
-    - Caminhadas longas: ponto de referência
-    - Transporte: linha, parada/estação de partida, chegada, duração e emoji
+    Formata a resposta da API do Google Directions em texto para o WhatsApp.
+    Inclui até 5 rotas, instruções passo a passo e cálculo do preço total.
     """
-    try:
-        rota = data['routes'][0]
-        perna = rota['legs'][0]
-        tempo_total = perna['duration']['text']
-        distancia_total = perna['distance']['text']
+    resposta = f"🚌 *Rota simulada de {origem} para {destino}:*\n"
+    for step in steps:
+        resposta += f"- {step}\n"
+    resposta += f"\n⏱️ Tempo estimado: {tempo} minutos."
+    
+    if not data.get("routes"):
+        return "❌ Não encontrei rotas para esse trajeto."
 
-        resposta = f"🚍 *ROTA DE {modo.upper()}*\n\n"
-        resposta += f"📍 *De:* {origem.title()}\n"
-        resposta += f"🎯 *Para:* {destino.title()}\n"
-        resposta += f"⏰ *Tempo:* {tempo_total}\n"
-        resposta += f"📏 *Distância:* {distancia_total}\n\n"
-        resposta += "📋 *Instruções:*\n"
+    resposta = "📍 *Rotas encontradas:*\n\n"
 
-        contador = 1
+    # tabela de preços fixos por modal
+    tabela_precos = {
+        "Ônibus": 4.05,
+        "Metrô": 5.00,
+        "Trem": 5.00,
+        "BRT": 4.05,
+        "VLT": 4.05,
+        "Caminhar": 0.00
+    }
+
+    for idx, rota in enumerate(data["routes"][:5], 1):
+        legs = rota.get("legs", [])
         preco_total = 0.0
-        ultimo_transporte = None  # guarda o transporte do trecho anterior
+        instrucoes = []
 
-        steps = perna['steps']
-        i = 0
-        while i < len(steps):
-            etapa = steps[i]
-            travel_mode = etapa.get('travel_mode', '').lower()
-            instrucao = _limpar_html(etapa.get('html_instructions', ''))
-            distancia_etapa = etapa.get('distance', {}).get('value', 0)  # em metros
+        for leg in legs:
+            for step in leg.get("steps", []):
+                travel_mode = step.get("travel_mode", "").upper()
+                instrucao = step.get("html_instructions", "")
+                distancia = step.get("distance", {}).get("text", "")
+                duracao = step.get("duration", {}).get("text", "")
 
-            # --- Caminhadas ---
-            if travel_mode == 'walking':
-                # Próxima etapa é transporte público
-                if i + 1 < len(steps) and steps[i + 1].get('travel_mode', '').lower() == 'transit':
-                    prox_etapa = steps[i + 1]
-                    transit_details = prox_etapa.get('transit_details', {})
-                    rotulo, tipo_real = _rotulo_transporte(transit_details)
-                    
-                    # Determina tipo do transporte
-                    tipo_transporte = tipo_real  # ex: Ônibus, Metrô, BRT
-                    nome_local = "estação" if tipo_transporte in ['BRT','Trem','VLT','Metrô','Metro'] else "parada"
-                    
-                    # Somar preço apenas se transporte mudou
-                    modo_trecho = tipo_transporte.lower()
-                    if modo_trecho == 'brt':
-                        modo_trecho = 'onibus'
-                    if modo_trecho != ultimo_transporte:
-                        preco_total += calcular_preco_transporte(modo_trecho)
-                        ultimo_transporte = modo_trecho
+                if travel_mode == "WALKING":
+                    instrucoes.append(f"🚶 {instrucao} ({distancia}, {duracao})")
+                    preco_total += tabela_precos.get("Caminhar", 0.0)
 
-                    departure_stop = transit_details.get('departure_stop', {}).get('name', 'parada')
-                    resposta += f"{contador}. 🚶‍♂️ Ande até a {nome_local} de {rotulo} na rua {departure_stop} (aprox. 100m)\n"
-                    contador += 1
+                elif travel_mode == "TRANSIT":
+                    transit = step.get("transit_details", {})
+                    linha = transit.get("line", {})
+                    nome_linha = linha.get("short_name") or linha.get("name", "Linha desconhecida")
+                    tipo = linha.get("vehicle", {}).get("type", "").capitalize()
 
-                    # Transporte
-                    arrival_stop = transit_details.get('arrival_stop', {}).get('name', 'destino')
-                    duracao = prox_etapa.get('duration', {}).get('text', '')
-                    emoji = {
-                        'Ônibus': '🚌',
-                        'VLT': '🚋',
-                        'Metrô': '🚇',
-                        'Trem': '🚆',
-                        'Barca': '⛴️'
-                    }.get(tipo_transporte, '🚌')
-                    resposta += f"{contador}. {emoji} Pegue o {rotulo} → desça em {arrival_stop} ({duracao})\n"
-                    contador += 1
-                    i += 2
-                    continue
-                else:
-                    # Caminhada sem transporte próximo
-                    if distancia_etapa >= 200:
-                        lat = etapa['start_location']['lat']
-                        lng = etapa['start_location']['lng']
-                        pontos = obter_pontos_de_referencia(lat, lng)
-                        if pontos:
-                            referencia = pontos[0]['nome']
-                            resposta += f"{contador}. 🚶‍♂️ {instrucao} (passando por {referencia})\n"
-                        else:
-                            resposta += f"{contador}. 🚶‍♂️ {instrucao}\n"
-                    else:
-                        resposta += f"{contador}. 🚶‍♂️ {instrucao}\n"
-                    contador += 1
+                    if tipo == "Bus":
+                        tipo = "Ônibus"
+                    elif tipo == "Subway":
+                        tipo = "Metrô"
+                    elif tipo == "Train":
+                        tipo = "Trem"
+                    elif tipo == "Tram":
+                        tipo = "VLT"
+                    elif tipo == "Bus rapid transit":
+                        tipo = "BRT"
 
-            # --- Transporte isolado ---
-            elif travel_mode == 'transit':
-                transit_details = etapa.get('transit_details', {})
-                rotulo, tipo_real = _rotulo_transporte(transit_details)
-                
-                tipo_transporte = tipo_real
-                nome_local = "estação" if tipo_transporte in ['BRT','Trem','VLT','Metrô','Metro'] else "parada"
-                
-                departure_stop = transit_details.get('departure_stop', {}).get('name', 'ponto inicial')
-                arrival_stop = transit_details.get('arrival_stop', {}).get('name', 'ponto final')
-                duracao = etapa.get('duration', {}).get('text', '')
-                distancia_caminhada = etapa.get('distance', {}).get('value', 100)
+                    instrucoes.append(f"🚌 Pegue o {tipo} {nome_linha} ({duracao})")
+                    preco_total += tabela_precos.get(tipo, 0.0)
 
-                emoji = {
-                    'Ônibus': '🚌',
-                    'VLT': '🚋',
-                    'Metrô': '🚇',
-                    'Trem': '🚆',
-                    'Barca': '⛴️'
-                }.get(tipo_transporte, '🚌')
+        resposta += f"*Rota {idx}:*\n"
+        resposta += "📋 *Instruções:*\n" + "\n".join(instrucoes) + "\n"
+        resposta += f"💰 *Preço estimado:* R$ {preco_total:.2f}\n"
+        resposta += "──────────────────────────────\n"
 
-                resposta += f"{contador}. 🚶‍♂️ Ande {distancia_caminhada}m até a {nome_local} em {departure_stop}\n"
-                contador += 1
-                resposta += f"{contador}. {emoji} Pegue o {rotulo} → desça em {arrival_stop} ({duracao})\n"
-
-                # Soma o preço do trecho atual
-                modo_atual = tipo_transporte.lower()
-                if modo_atual == 'brt':
-                    modo_atual = 'onibus'
-                if modo_atual != ultimo_transporte:
-                    preco_total += calcular_preco_transporte(modo_atual)
-                    ultimo_transporte = modo_atual
-
-            # --- Outros modos ---
-            else:
-                resposta += f"{contador}. 📍 {instrucao}\n"
-                contador += 1
-
-            i += 1
-
-        resposta += f"\n💰 Valor aproximado total da passagem: R$ {preco_total:.2f}\n"
-        return resposta
-
-    except Exception as e:
-        print(f"Erro ao formatar rota: {e}")
-        return "❌ Não foi possível formatar a rota detalhada."
-
+    return resposta
 
 # --- Rota simulada ---
 def gerar_rota_simulada(origem, destino, modo):
