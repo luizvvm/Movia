@@ -5,3 +5,4 @@ twilio
 google-generativeai
 google-cloud-firestore
 gunicorn
+requests

@@ -6,7 +6,7 @@ import config
 # Importando nossos serviços e módulos
 from services import gemini_service, database_service
 from modules import routing_module, safety_module, sustainability_module
-from modules.routing_module import formatar_lista_transportes, interpretar_escolha_transporte
+from modules.routing_module import formatar_lista_transportes, interpretar_escolha_transporte_nome
 from preferences_module import processar_preferencia  
 
 # Cria uma instância da aplicação Flask, que será o núcleo do servidor web.
