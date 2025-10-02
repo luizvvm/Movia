@@ -1,0 +1,25 @@
+{
+  "name": "movia",
+  "version": "1.0.0",
+  "description": "![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white) ![Flask](https://img.shields.io/badge/Flask-2.2+-black?logo=flask&logoColor=white) ![Google Cloud](https://img.shields.io/badge/Google_Cloud-4285F4?logo=google-cloud&logoColor=white) ![Twilio](https://img.shields.io/badge/Twilio-F22F46?logo=twilio&logoColor=white) ![License](https://img.shields.io/badge/License-MIT-green.svg)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luizvvm/Movia.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/luizvvm/Movia/issues"
+  },
+  "homepage": "https://github.com/luizvvm/Movia#readme",
+  "dependencies": {
+    "node-fetch": "^2.7.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "latest"
+  }
+}
