@@ -39,7 +39,7 @@ client.on('message', async (message) => {
 
     try {
         // A. Envia a mensagem do usuário para o nosso "Cérebro" (backend Flask)
-        const response = await fetch('http://127.0.0.1:5000/process-message', {
+        const response = await fetch('http://localhost:10000/process-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
