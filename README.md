@@ -1,3 +1,5 @@
+[🇺🇸 English Version](README.en-US.md)
+
 # Movia - Sua Assistente de Mobilidade Inteligente
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
